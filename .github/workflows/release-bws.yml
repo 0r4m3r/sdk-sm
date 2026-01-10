@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 0
 
       - name: Ensure tag is on mcr/release
-        uses: 0r4m3r/gh-actions/require-release-tip@dde7f9b094c1abd78c58f1975b27cc953b62dba7
+        uses: 0r4m3r/gh-actions/require-release-tip@dbc3ae6099c8422c4332da98e2c0da36cd31c336
         with:
           release_branch: mcr/release
 
