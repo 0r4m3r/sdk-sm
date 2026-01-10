@@ -43,7 +43,19 @@ jobs:
         run: |
           api="https://api.github.com/repos/${GH_REPO}/actions/runs/${RUN_ID}/artifacts"
           resp="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}")"
-          artifact_url="$(printf '%s' "${resp}" | python3 -c 'import json,sys; data=json.load(sys.stdin); url=next((a[\"archive_download_url\"] for a in data.get(\"artifacts\", []) if not a.get(\"expired\") and a.get(\"name\", \"\").startswith(\"bws-x86_64-unknown-linux-gnu-\")), \"\"); print(url)')" || {
+          cat > /tmp/find_artifact.py <<'PY'
+import json, sys
+data = json.load(sys.stdin)
+for art in data.get("artifacts", []):
+    if art.get("expired"):
+        continue
+    name = art.get("name", "")
+    if name.startswith("bws-x86_64-unknown-linux-gnu-"):
+        print(art["archive_download_url"])
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+          artifact_url="$(printf '%s' "${resp}" | python3 /tmp/find_artifact.py)" || {
             echo "No artifacts found for run ${RUN_ID}." >&2
             echo "${resp}" >&2
             exit 1
