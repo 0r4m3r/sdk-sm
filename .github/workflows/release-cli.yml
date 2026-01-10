@@ -36,12 +36,33 @@ jobs:
           echo "version=${TAG#gl-bws-cli-v}" >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: packages
-          run-id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
-          merge-multiple: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          api="https://api.github.com/repos/${GH_REPO}/actions/runs/${RUN_ID}/artifacts"
+          resp="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}")"
+          artifact_url="$(python3 - <<'PY'
+import json, sys
+data = json.load(sys.stdin)
+for art in data.get("artifacts", []):
+    if art.get("expired"):
+        continue
+    name = art.get("name", "")
+    if name.startswith("bws-x86_64-unknown-linux-gnu-"):
+        print(art["archive_download_url"])
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+<<<"${resp}")" || {
+            echo "No artifacts found for run ${RUN_ID}." >&2
+            echo "${resp}" >&2
+            exit 1
+          }
+          mkdir -p packages
+          curl -sS -L -H "Authorization: Bearer ${GH_TOKEN}" -o /tmp/artifact.zip "${artifact_url}"
+          unzip -q /tmp/artifact.zip -d packages
 
       - name: Verify artifacts
         run: |
