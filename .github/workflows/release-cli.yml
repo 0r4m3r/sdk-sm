@@ -67,13 +67,13 @@ jobs:
       - name: Verify artifacts
         run: |
           ls -la packages
-          test -f "packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.zip"
+          test -f "packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.tar.gz"
           test -f "packages/bws-sha256-checksums-${{ steps.tag.outputs.version }}.txt"
 
       - name: Create GitHub release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         with:
-          artifacts: packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.zip,packages/bws-sha256-checksums-${{ steps.tag.outputs.version }}.txt
+          artifacts: packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.tar.gz,packages/bws-sha256-checksums-${{ steps.tag.outputs.version }}.txt
           tag: ${{ steps.tag.outputs.tag }}
           name: bws CLI v${{ steps.tag.outputs.version }}
           generateReleaseNotes: true
