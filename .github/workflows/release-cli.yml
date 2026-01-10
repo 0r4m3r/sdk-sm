@@ -13,7 +13,9 @@ jobs:
   release:
     name: Create GitHub release (linux)
     runs-on: ubuntu-22.04
-    if: github.event.workflow_run.conclusion == 'success'
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'gl-bws-cli-v')
     steps:
       - name: Checkout repo
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -25,11 +27,7 @@ jobs:
       - name: Resolve tag
         id: tag
         run: |
-          TAG="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^gl-bws-cli-v' | head -n1)"
-          if [ -z "${TAG}" ]; then
-            echo "No gl-bws-cli-v* tag found for ${{ github.event.workflow_run.head_sha }}." >&2
-            exit 1
-          fi
+          TAG="${{ github.event.workflow_run.head_branch }}"
           if [[ ! "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Unexpected tag ${TAG}." >&2
             exit 1
