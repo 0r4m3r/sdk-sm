@@ -1,0 +1,87 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/staging"'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/release"'
+    - changes:
+        - "**/*.rs"
+        - "**/*.toml"
+        - "**/*.lock"
+        - "crates/**"
+        - "Cargo.toml"
+        - "Cargo.lock"
+        - ".gitlab-ci.yml"
+        - "scripts/**"
+    - when: never
+
+stages:
+  - verify
+  - test
+  - github-sync
+
+include:
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/verify.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/test.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/gh-release/gh-push-validate.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/gh-release/gh-push-release.yml'
+
+# Repo-specific overrides for this workspace
+variables:
+  CARGO_TEST_FLAGS: ''
+  CARGO_BUILD_FLAGS: >
+    
+  CARGO_FMT_FLAGS: ''
+  CARGO_CLIPPY_FLAGS: >
+    
+
+# Override shared rules locally for protected branches
+.fmt_rules: &fmt_rules
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/staging"'
+      when: manual
+    - when: never
+
+.clippy_rules: &clippy_rules
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/staging"'
+      when: manual
+    - when: never
+
+.cargo_test_rules: &cargo_test_rules
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/staging"'
+      when: manual
+    - when: never
+
+.gh_sync_validate_rules: &gh_sync_validate_rules
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/release" && $CI_COMMIT_TAG =~ /^gl-/'
+    - when: never
+
+.gh_push_release_rules: &gh_push_release_rules
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_REF_NAME == "mcr/release" && $CI_COMMIT_TAG =~ /^gl-/'
+    - when: never
+
+fmt:
+  <<: *fmt_rules
+
+clippy:
+  <<: *clippy_rules
+
+cargo_test:
+  <<: *cargo_test_rules
+
+gh_sync_validate:
+  <<: *gh_sync_validate_rules
+
+gh_push_release:
+  <<: *gh_push_release_rules
