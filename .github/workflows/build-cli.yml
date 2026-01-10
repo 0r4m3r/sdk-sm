@@ -28,7 +28,7 @@ jobs:
 
       - name: Ensure tag is on mcr/release
         if: startsWith(github.ref, 'refs/tags/gl-')
-        uses: 0r4m3r/gh-actions/require-release-tip@dbc3ae6099c8422c4332da98e2c0da36cd31c336
+        uses: 0r4m3r/gh-actions/require-release-tip@740463e277e6c8069ce694d9db19c08f1507efa3
         with:
           release_branch: mcr/release
 
