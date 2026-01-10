@@ -40,16 +40,6 @@ jobs:
           VERSION=$(grep -o '^version = ".*"' crates/bws/Cargo.toml | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
           echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Sign if repo is owned by Bitwarden
-        id: sign
-        env:
-          REPO_OWNER: ${{ github.repository_owner }}
-        run: |
-          if [[ $REPO_OWNER == bitwarden ]]; then
-            echo "sign=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "sign=false" >> "$GITHUB_OUTPUT"
-
       - name: Validate gl-bws-cli-v* tag
         if: startsWith(github.ref, 'refs/tags/gl-')
         run: |
@@ -59,6 +49,15 @@ jobs:
           fi
           echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.1)." >&2
           exit 1
+
+      - name: Validate tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/gl-')
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/gl-bws-cli-v}"
+          if [[ "${TAG_VERSION}" != "${{ steps.retrieve-version.outputs.package_version }}" ]]; then
+            echo "Tag version ${TAG_VERSION} does not match Cargo.toml version ${{ steps.retrieve-version.outputs.package_version }}." >&2
+            exit 1
+          fi
 
   build-linux:
     name: Build bws CLI (linux)
@@ -92,9 +91,44 @@ jobs:
       - name: Zip linux
         run: zip -j "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.zip" ./target/${{ env.TARGET }}/release/bws
 
+      - name: Create checksum
+        run: |
+          sha256sum "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.zip" > "./bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
+
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
-          path: ./bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
+          name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}
+          path: |
+            ./bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
+            ./bws-sha256-checksums-${_PACKAGE_VERSION}.txt
           if-no-files-found: error
+
+  release:
+    name: Release bws CLI (linux)
+    runs-on: ubuntu-22.04
+    needs: build-linux
+    if: startsWith(github.ref, 'refs/tags/gl-')
+    permissions:
+      contents: write
+    env:
+      _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
+      TARGET: x86_64-unknown-linux-gnu
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}
+          path: packages
+
+      - name: Create GitHub release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        with:
+          artifacts: |
+            packages/bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
+            packages/bws-sha256-checksums-${{ env._PACKAGE_VERSION }}.txt
+          commit: ${{ github.sha }}
+          tag: ${{ github.ref_name }}
+          name: bws CLI v${{ env._PACKAGE_VERSION }}
+          generateReleaseNotes: true
+          draft: true
