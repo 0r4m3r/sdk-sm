@@ -1,9 +1,9 @@
 name: Release CLI
 
 on:
-  workflow_run:
-    workflows: ["Build CLI"]
-    types: [completed]
+  push:
+    tags:
+      - "gl-bws-cli-v*"
 
 permissions:
   contents: write
@@ -13,36 +13,55 @@ jobs:
   release:
     name: Create GitHub release (linux)
     runs-on: ubuntu-22.04
-    if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout repo
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Resolve tag
         id: tag
         run: |
-          TAG="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^gl-bws-cli-v' | head -n1)"
-          if [ -z "${TAG}" ]; then
-            echo "No gl-bws-cli-v* tag found for ${{ github.event.workflow_run.head_sha }}." >&2
-            exit 1
-          fi
+          TAG="${GITHUB_REF#refs/tags/}"
           if [[ ! "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Unexpected tag ${TAG}." >&2
             exit 1
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#gl-bws-cli-v}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve build run id
+        id: build-run
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_SHA: ${{ steps.tag.outputs.sha }}
+        run: |
+          api="https://api.github.com/repos/${GH_REPO}/actions/workflows/build-cli.yml/runs?event=push&status=completed&per_page=50"
+          run_id=""
+          for _ in $(seq 1 20); do
+            resp="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}")"
+            run_id="$(printf '%s' "${resp}" | python3 - <<'PY'\nimport json, os\nsha = os.environ['TARGET_SHA']\ndata = json.load(sys.stdin)\nfor run in data.get('workflow_runs', []):\n    if run.get('head_sha') == sha and run.get('conclusion') == 'success':\n        print(run['id'])\n        raise SystemExit(0)\nraise SystemExit(1)\nPY\n)" || true
+            if [ -n "${run_id}" ]; then
+              break
+            fi
+            sleep 15
+          done
+          if [ -z "${run_id}" ]; then
+            echo "No successful Build CLI run found for ${TARGET_SHA}." >&2
+            exit 1
+          fi
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}
           path: packages
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.build-run.outputs.run_id }}
           repository: ${{ github.repository }}
 
       - name: Verify artifacts
