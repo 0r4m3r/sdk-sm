@@ -2,8 +2,10 @@ name: Build CLI
 
 on:
   push:
+    branches:
+      - "mcr/release"
     tags:
-      - "gl-*"
+      - "gl-bws-cli-v*"
   workflow_dispatch:
 
 defaults:
@@ -27,6 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Ensure tag is on mcr/release
+        if: startsWith(github.ref, 'refs/tags/gl-')
         uses: 0r4m3r/gh-actions/require-release-tip@dbc3ae6099c8422c4332da98e2c0da36cd31c336
         with:
           release_branch: mcr/release
@@ -47,263 +50,25 @@ jobs:
           fi
           echo "sign=false" >> "$GITHUB_OUTPUT"
 
-      - name: Validate gl-* tag
+      - name: Validate gl-bws-cli-v* tag
         if: startsWith(github.ref, 'refs/tags/gl-')
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          if [[ "${TAG}" =~ ^gl-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             exit 0
           fi
-          echo "Invalid tag: ${TAG}. Expected gl-<semver> (e.g. gl-1.2.3)." >&2
+          echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.1)." >&2
           exit 1
 
-  build-windows:
-    name: Building CLI for - ${{ matrix.settings.os }} - ${{ matrix.settings.target }}
-    runs-on: ${{ matrix.settings.os || 'ubuntu-24.04' }}
-    needs: setup
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - os: windows-2022
-            target: x86_64-pc-windows-msvc
-
-          - os: windows-2022
-            target: aarch64-pc-windows-msvc
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
-        with:
-          toolchain: stable
-          targets: ${{ matrix.settings.target }}
-
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.os }}
-
-      - name: Build
-        env:
-          TARGET: ${{ matrix.settings.target }}
-        run: cargo build -p bws --release --target=${{ matrix.settings.target }}
-
-      - name: Log in to Azure
-        if: ${{ needs.setup.outputs.sign == 'true' }}
-        uses: bitwarden/gh-actions/azure-login@main
-        with:
-          subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-          client_id: ${{ secrets.AZURE_CLIENT_ID }}
-
-      - name: Retrieve secrets
-        if: ${{ needs.setup.outputs.sign == 'true' }}
-        id: retrieve-secrets-windows
-        uses: bitwarden/gh-actions/get-keyvault-secrets@main
-        with:
-          keyvault: "bitwarden-ci"
-          secrets: "code-signing-vault-url,
-            code-signing-client-id,
-            code-signing-tenant-id,
-            code-signing-client-secret,
-            code-signing-cert-name"
-
-      - name: Log out from Azure
-        uses: bitwarden/gh-actions/azure-logout@main
-
-      - name: Install AST
-        if: ${{ needs.setup.outputs.sign == 'true' }}
-        run: dotnet tool install --global AzureSignTool --version 4.0.1
-
-      - name: Sign windows binary
-        if: ${{ needs.setup.outputs.sign == 'true' }}
-        env:
-          SIGNING_VAULT_URL: ${{ steps.retrieve-secrets-windows.outputs.code-signing-vault-url }}
-          SIGNING_CLIENT_ID: ${{ steps.retrieve-secrets-windows.outputs.code-signing-client-id }}
-          SIGNING_TENANT_ID: ${{ steps.retrieve-secrets-windows.outputs.code-signing-tenant-id }}
-          SIGNING_CLIENT_SECRET: ${{ steps.retrieve-secrets-windows.outputs.code-signing-client-secret }}
-          SIGNING_CERT_NAME: ${{ steps.retrieve-secrets-windows.outputs.code-signing-cert-name }}
-        run: |
-          azuresigntool sign -v \
-            -kvu "$SIGNING_VAULT_URL" \
-            -kvi "$SIGNING_CLIENT_ID" \
-            -kvt "$SIGNING_TENANT_ID" \
-            -kvs "$SIGNING_CLIENT_SECRET" \
-            -kvc "$SIGNING_CERT_NAME" \
-            -fd sha256 \
-            -du https://bitwarden.com \
-            -tr http://timestamp.digicert.com \
-            ./target/${{ matrix.settings.target }}/release/bws.exe
-
-      - name: Zip
-        shell: cmd
-        run: 7z a ./bws-${{ matrix.settings.target }}-%_PACKAGE_VERSION%.zip ./target/${{ matrix.settings.target }}/release/bws.exe
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          path: ./bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          if-no-files-found: error
-
-  build-macos:
-    name: Building CLI for - ${{ matrix.settings.os }} - ${{ matrix.settings.target }}
-    runs-on: ${{ matrix.settings.os || 'ubuntu-24.04' }}
-    needs: setup
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - os: macos-15
-            target: x86_64-apple-darwin
-
-          - os: macos-15
-            target: aarch64-apple-darwin
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
-        with:
-          toolchain: stable
-          targets: ${{ matrix.settings.target }}
-
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.os }}
-
-      - name: Build
-        env:
-          TARGET: ${{ matrix.settings.target }}
-        run: cargo build -p bws --release --target=${{ matrix.settings.target }}
-
-      - name: Log in to Azure
-        uses: bitwarden/gh-actions/azure-login@main
-        with:
-          subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-          client_id: ${{ secrets.AZURE_CLIENT_ID }}
-
-      - name: Retrieve secrets macos
-        id: retrieve-secrets-macos
-        uses: bitwarden/gh-actions/get-keyvault-secrets@main
-        with:
-          keyvault: "bitwarden-ci"
-          secrets: "macos-bws-notarization-apple-id,
-            macos-bws-notarization-team-id,
-            macos-bws-notarization-password,
-            macos-bws-certificate-name,
-            macos-bws-installer-certificate-name"
-
-      - name: Get Azure Key Vault secrets
-        id: get-kv-secrets
-        uses: bitwarden/gh-actions/get-keyvault-secrets@main
-        with:
-          keyvault: gh-sdk-sm
-          secrets: "DECRYPT-FILE-PASSWORD, KEYCHAIN-PASSWORD, DEVID-CERT-PASSWORD"
-
-      - name: Log out from Azure
-        uses: bitwarden/gh-actions/azure-logout@main
-
-      - name: Decrypt secrets
-        env:
-          DECRYPT_FILE_PASSWORD: ${{ steps.get-kv-secrets.outputs.DECRYPT-FILE-PASSWORD }}
-        run: |
-          mkdir -p "$HOME/secrets"
-
-          gpg --quiet --batch --yes --decrypt --passphrase="$DECRYPT_FILE_PASSWORD" \
-            --output "$HOME/secrets/devid-app-cert.p12" \
-            "$GITHUB_WORKSPACE/.github/secrets/devid-app-cert.p12.gpg"
-
-      - name: Set up keychain
-        env:
-          KEYCHAIN_PASSWORD: ${{ steps.get-kv-secrets.outputs.KEYCHAIN-PASSWORD }}
-          DEVID_CERT_PASSWORD: ${{ steps.get-kv-secrets.outputs.DEVID-CERT-PASSWORD }}
-        run: |
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 1200 build.keychain
-
-          ls "$HOME/secrets"
-
-          security import "$HOME/secrets/devid-app-cert.p12" -k build.keychain -P "$DEVID_CERT_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/productbuild
-
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
-      - name: Sign macos
-        env:
-          MACOS_CERTIFICATE_NAME: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-certificate-name }}
-        run: codesign --sign "$MACOS_CERTIFICATE_NAME" --verbose=3 --force --options=runtime --timestamp  ./target/${{ matrix.settings.target }}/release/bws
-
-      - name: Notarize app macos
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-apple-id }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-team-id }}
-          MACOS_NOTARIZATION_PWD: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-password }}
-          MACOS_CERTIFICATE_NAME: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-certificate-name }}
-        run: |
-          echo "Create keychain profile"
-          xcrun notarytool store-credentials "notarytool-profile" --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD"
-
-          echo "Creating notarization archive"
-          zip -j "./bws-${{ matrix.settings.target }}-${_PACKAGE_VERSION}.zip" ./target/${{ matrix.settings.target }}/release/bws
-
-          codesign --sign "$MACOS_CERTIFICATE_NAME" --verbose=3 --force --options=runtime --timestamp "./bws-${{ matrix.settings.target }}-${_PACKAGE_VERSION}.zip"
-
-          echo "Notarize app"
-          xcrun notarytool submit "./bws-${{ matrix.settings.target }}-${_PACKAGE_VERSION}.zip" --keychain-profile "notarytool-profile" --wait
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          path: ./bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          if-no-files-found: error
-
   build-linux:
-    name: Building CLI for - ${{ matrix.settings.os }} - ${{ matrix.settings.target }}
-    runs-on: ${{ matrix.settings.os || 'ubuntu-24.04' }}
+    name: Build bws CLI (linux)
+    runs-on: ubuntu-22.04
     needs: setup
     permissions:
       contents: read
     env:
       _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-musl
-
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-musl
-
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
+      TARGET: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout repo
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -314,228 +79,22 @@ jobs:
         uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
         with:
           toolchain: stable
-          targets: ${{ matrix.settings.target }}
-
-      - name: Set up Zig
-        uses: mlugg/setup-zig@fa65c4058643678a4e4a9a60513944a7d8d35440 # v2.1.0
-        with:
-          version: 0.15.1
+          targets: ${{ env.TARGET }}
 
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.os }}
-
-      - name: Install Zigbuild
-        run: cargo install cargo-zigbuild --locked --git https://github.com/rust-cross/cargo-zigbuild --rev 6f7e1336c9cd13cf1b3704f93c40fcf84caaed6b # 0.18.4
+          key: ${{ env.TARGET }}-cargo-linux
 
       - name: Build
-        env:
-          TARGET: ${{ matrix.settings.target }}
-        run: cargo zigbuild -p bws --release --target=${{ matrix.settings.target }}
+        run: cargo build -p bws --release --target=${{ env.TARGET }}
 
       - name: Zip linux
-        run: zip -j "./bws-${{ matrix.settings.target }}-${_PACKAGE_VERSION}.zip" ./target/${{ matrix.settings.target }}/release/bws
+        run: zip -j "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.zip" ./target/${{ env.TARGET }}/release/bws
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          path: ./bws-${{ matrix.settings.target }}-${{ env._PACKAGE_VERSION }}.zip
-          if-no-files-found: error
-
-  macos-universal-binary:
-    name: Generate universal macOS binary
-    runs-on: macos-15
-    needs:
-      - setup
-      - build-macos
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download x86_64-apple-darwin artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: bws-x86_64-apple-darwin-${{ env._PACKAGE_VERSION }}.zip
-
-      - name: Download aarch64-apple-darwin artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: bws-aarch64-apple-darwin-${{ env._PACKAGE_VERSION }}.zip
-
-      - name: Unzip artifacts
-        run: |
-          unzip "bws-x86_64-apple-darwin-${_PACKAGE_VERSION}.zip" -d ./bws-x86_64-apple-darwin
-          unzip "bws-aarch64-apple-darwin-${_PACKAGE_VERSION}.zip" -d ./bws-aarch64-apple-darwin
-
-      - name: Create universal package with lipo
-        run: |
-          mkdir ./bws-macos-universal
-
-          lipo -create -output ./bws-macos-universal/bws ./bws-x86_64-apple-darwin/bws ./bws-aarch64-apple-darwin/bws
-
-      - name: Log in to Azure
-        uses: bitwarden/gh-actions/azure-login@main
-        with:
-          subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-          client_id: ${{ secrets.AZURE_CLIENT_ID }}
-
-      - name: Retrieve secrets
-        id: retrieve-secrets-macos
-        uses: bitwarden/gh-actions/get-keyvault-secrets@main
-        with:
-          keyvault: "bitwarden-ci"
-          secrets: "macos-bws-notarization-apple-id,
-            macos-bws-notarization-team-id,
-            macos-bws-notarization-password,
-            macos-bws-certificate-name,
-            macos-bws-installer-certificate-name"
-
-      - name: Get Azure Key Vault secrets
-        id: get-kv-secrets
-        uses: bitwarden/gh-actions/get-keyvault-secrets@main
-        with:
-          keyvault: gh-sdk-sm
-          secrets: "DECRYPT-FILE-PASSWORD, KEYCHAIN-PASSWORD, DEVID-CERT-PASSWORD"
-
-      - name: Log out from Azure
-        uses: bitwarden/gh-actions/azure-logout@main
-
-      - name: Decrypt secrets
-        env:
-          DECRYPT_FILE_PASSWORD: ${{ steps.get-kv-secrets.outputs.DECRYPT-FILE-PASSWORD }}
-        run: |
-          mkdir -p "$HOME/secrets"
-
-          gpg --quiet --batch --yes --decrypt --passphrase="$DECRYPT_FILE_PASSWORD" \
-            --output "$HOME/secrets/devid-app-cert.p12" \
-            "$GITHUB_WORKSPACE/.github/secrets/devid-app-cert.p12.gpg"
-
-      - name: Set up keychain
-        env:
-          KEYCHAIN_PASSWORD: ${{ steps.get-kv-secrets.outputs.KEYCHAIN-PASSWORD }}
-          DEVID_CERT_PASSWORD: ${{ steps.get-kv-secrets.outputs.DEVID-CERT-PASSWORD }}
-        run: |
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 1200 build.keychain
-
-          security import "$HOME/secrets/devid-app-cert.p12" -k build.keychain -P "$DEVID_CERT_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/productbuild
-
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
-      - name: Sign binary
-        env:
-          MACOS_CERTIFICATE_NAME: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-certificate-name }}
-        run: codesign --sign "$MACOS_CERTIFICATE_NAME" --verbose=3 --force --options=runtime --timestamp ./bws-macos-universal/bws
-
-      - name: Notarize app
-        env:
-          MACOS_NOTARIZATION_APPLE_ID: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-apple-id }}
-          MACOS_NOTARIZATION_TEAM_ID: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-team-id }}
-          MACOS_NOTARIZATION_PWD: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-notarization-password }}
-          MACOS_CERTIFICATE_NAME: ${{ steps.retrieve-secrets-macos.outputs.macos-bws-certificate-name }}
-        run: |
-
-          echo "Create keychain profile"
-          xcrun notarytool store-credentials "notarytool-profile" --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD"
-
-          echo "Creating notarization archive"
-          zip -j "./bws-macos-universal-${_PACKAGE_VERSION}.zip" ./bws-macos-universal/bws
-
-          codesign --sign "$MACOS_CERTIFICATE_NAME" --verbose=3 --force --options=runtime --timestamp  "./bws-macos-universal-${_PACKAGE_VERSION}.zip"
-
-          echo "Notarize app"
-          xcrun notarytool submit "./bws-macos-universal-${_PACKAGE_VERSION}.zip" --keychain-profile "notarytool-profile" --wait
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: bws-macos-universal-${{ env._PACKAGE_VERSION }}.zip
-          path: ./bws-macos-universal-${{ env._PACKAGE_VERSION }}.zip
-          if-no-files-found: error
-
-  third_party:
-    name: Generate THIRDPARTY.html
-    runs-on: ubuntu-22.04
-    needs:
-      - setup
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          key: cargo-cli-about
-
-      - name: Install cargo-about
-        run: cargo install cargo-about
-
-      - name: Generate THIRDPARTY.html
-        working-directory: ./crates/bws
-        run: |
-          cargo about generate ../../about.hbs > THIRDPARTY.html
-          sed -i.bak "s/\$NAME\$/Bitwarden Secrets Manager CLI/g" THIRDPARTY.html
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: THIRDPARTY.html
-          path: ./crates/bws/THIRDPARTY.html
-          if-no-files-found: error
-
-  manpages:
-    name: Generate manpages
-    runs-on: ubuntu-22.04
-    needs: setup
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          key: cargo-cli-manpage
-
-      - name: Generate manpages
-        run: |
-          cargo check -p bws --message-format json > build.json
-          OUT_DIR=$(jq -r --slurp '.[] | select (.reason == "build-script-executed") | select(.package_id|contains("crates/bws")) .out_dir' build.json)
-          mv "$OUT_DIR/manpages" .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: manpages
-          path: ./manpages/*
+          name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
+          path: ./bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
           if-no-files-found: error
