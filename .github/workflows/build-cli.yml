@@ -105,7 +105,9 @@ jobs:
   release:
     name: Release bws CLI (linux)
     runs-on: ubuntu-22.04
-    needs: build-linux
+    needs:
+      - setup
+      - build-linux
     if: startsWith(github.ref, 'refs/tags/gl-')
     permissions:
       contents: write
