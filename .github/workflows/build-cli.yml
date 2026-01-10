@@ -2,8 +2,6 @@ name: Build CLI
 
 on:
   push:
-    branches:
-      - "mcr/release"
     tags:
       - "gl-bws-cli-v*"
   workflow_dispatch:
