@@ -85,18 +85,18 @@ jobs:
       - name: Build
         run: cargo build -p bws --release --target=${{ env.TARGET }}
 
-      - name: Zip linux
-        run: zip -j "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.zip" ./target/${{ env.TARGET }}/release/bws
+      - name: Pack linux tarball
+        run: tar -czf "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.tar.gz" -C "./target/${{ env.TARGET }}/release" bws
 
       - name: Create checksum
         run: |
-          sha256sum "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.zip" > "./bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
+          sha256sum "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.tar.gz" > "./bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}
           path: |
-            ./bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
+            ./bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.tar.gz
             ./bws-sha256-checksums-${{ env._PACKAGE_VERSION }}.txt
           if-no-files-found: error
