@@ -1,0 +1,42 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - changes:
+        - "**/*.rs"
+        - "**/*.toml"
+        - "**/*.lock"
+        - "crates/**"
+        - "Cargo.toml"
+        - "Cargo.lock"
+        - ".gitlab-ci.yml"
+        - "scripts/**"
+    - when: never
+
+stages:
+  - verify
+  - test
+  - github-sync
+
+include:
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/verify.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/test.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/github-validate.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/github-push.yml'
+
+# Repo-specific overrides for this workspace
+variables:
+  CARGO_TEST_FLAGS: '-p bws'
+  CARGO_BUILD_FLAGS: >
+    -p bws
+  CARGO_FMT_FLAGS: '-p bws'
+  CARGO_CLIPPY_FLAGS: >
+    -p bws -- -D warnings
