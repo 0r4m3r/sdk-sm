@@ -40,10 +40,10 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}
           path: packages
           run-id: ${{ github.event.workflow_run.id }}
           repository: ${{ github.repository }}
+          merge-multiple: true
 
       - name: Verify artifacts
         run: |
