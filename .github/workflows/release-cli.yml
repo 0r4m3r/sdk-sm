@@ -1,0 +1,62 @@
+name: Release CLI
+
+on:
+  workflow_run:
+    workflows: ["Build CLI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: Create GitHub release (linux)
+    runs-on: ubuntu-22.04
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^gl-bws-cli-v' | head -n1)"
+          if [ -z "${TAG}" ]; then
+            echo "No gl-bws-cli-v* tag found for ${{ github.event.workflow_run.head_sha }}." >&2
+            exit 1
+          fi
+          if [[ ! "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unexpected tag ${TAG}." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#gl-bws-cli-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}
+          path: packages
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
+
+      - name: Verify artifacts
+        run: |
+          ls -la packages
+          test -f "packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.zip"
+          test -f "packages/bws-sha256-checksums-${{ steps.tag.outputs.version }}.txt"
+
+      - name: Create GitHub release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        with:
+          artifacts: packages/bws-x86_64-unknown-linux-gnu-${{ steps.tag.outputs.version }}.zip,packages/bws-sha256-checksums-${{ steps.tag.outputs.version }}.txt
+          tag: ${{ steps.tag.outputs.tag }}
+          name: bws CLI v${{ steps.tag.outputs.version }}
+          generateReleaseNotes: true
+          draft: false
+          token: ${{ secrets.GITHUB_TOKEN }}

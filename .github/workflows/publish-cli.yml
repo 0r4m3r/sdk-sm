@@ -1,0 +1,19 @@
+name: Publish CLI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish bws CLI (linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Confirm published release
+        run: |
+          echo "Release published: ${{ github.event.release.tag_name }}"
+          echo "Assets:"
+          printf '%s\n' "${{ toJson(github.event.release.assets) }}"
