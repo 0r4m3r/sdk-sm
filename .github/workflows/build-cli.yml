@@ -120,13 +120,15 @@ jobs:
         with:
           name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}
           path: packages
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -la packages
 
       - name: Create GitHub release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         with:
-          artifacts: |
-            packages/bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip
-            packages/bws-sha256-checksums-${{ env._PACKAGE_VERSION }}.txt
+          artifacts: packages/bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}.zip,packages/bws-sha256-checksums-${{ env._PACKAGE_VERSION }}.txt
           commit: ${{ github.sha }}
           tag: ${{ github.ref_name }}
           name: bws CLI v${{ env._PACKAGE_VERSION }}
