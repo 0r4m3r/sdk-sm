@@ -44,7 +44,7 @@ jobs:
           run_id=""
           for _ in $(seq 1 20); do
             resp="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api}")"
-            run_id="$(printf '%s' "${resp}" | python3 - <<'PY'\nimport json, os\nsha = os.environ['TARGET_SHA']\ndata = json.load(sys.stdin)\nfor run in data.get('workflow_runs', []):\n    if run.get('head_sha') == sha and run.get('conclusion') == 'success':\n        print(run['id'])\n        raise SystemExit(0)\nraise SystemExit(1)\nPY\n)" || true
+            run_id="$(python3 -c 'import json,os,sys\nsha=os.environ[\"TARGET_SHA\"]\ndata=json.loads(sys.stdin.read())\nrun=next((r for r in data.get(\"workflow_runs\",[]) if r.get(\"head_sha\")==sha and r.get(\"conclusion\")==\"success\"), None)\nprint(run[\"id\"] if run else \"\")' <<<\"${resp}\")"
             if [ -n "${run_id}" ]; then
               break
             fi
