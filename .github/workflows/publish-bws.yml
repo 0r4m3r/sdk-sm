@@ -71,18 +71,9 @@ jobs:
           fetch-depth: 0
 
       - name: Ensure tag is on mcr/release
-        run: |
-          git fetch --prune --tags origin mcr/release
-          release_tip="$(git rev-parse origin/mcr/release)"
-          if [ "${GITHUB_SHA}" != "${release_tip}" ]; then
-            echo "Tag must point to the tip of mcr/release (${release_tip})." >&2
-            exit 1
-          fi
-          parents="$(git rev-list --parents -n 1 "${GITHUB_SHA}")"
-          if [ "$(echo "${parents}" | wc -w)" -ne 2 ]; then
-            echo "Tag must not be a merge commit." >&2
-            exit 1
-          fi
+        uses: 0r4m3r/gh-actions/require-release-tip@dde7f9b094c1abd78c58f1975b27cc953b62dba7
+        with:
+          release_branch: mcr/release
 
       - name: Tag check
         if: ${{ inputs.release_type != 'Dry Run' }}
