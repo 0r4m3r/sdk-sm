@@ -33,8 +33,10 @@ on:
         type: boolean
         default: true
   push:
+    branches:
+      - "mcr/release"
     tags:
-      - "gl-*"
+      - "gl-bws-cli-v*"
 
 env:
   _AZ_REGISTRY: bitwardenprod.azurecr.io
@@ -71,6 +73,7 @@ jobs:
           fetch-depth: 0
 
       - name: Ensure tag is on mcr/release
+        if: startsWith(github.ref, 'refs/tags/gl-')
         uses: 0r4m3r/gh-actions/require-release-tip@dbc3ae6099c8422c4332da98e2c0da36cd31c336
         with:
           release_branch: mcr/release
@@ -78,10 +81,10 @@ jobs:
       - name: Tag check
         if: ${{ inputs.release_type != 'Dry Run' }}
         run: |
-          if [[ "$GITHUB_REF" != refs/tags/gl-* ]]; then
-            echo "============================================"
-            echo "[!] Can only release from 'gl-*' tag pushes"
-            echo "============================================"
+          if [[ "$GITHUB_REF" != refs/tags/gl-bws-cli-v* ]]; then
+            echo "========================================================="
+            echo "[!] Can only release from 'gl-bws-cli-v*' tag pushes"
+            echo "========================================================="
             exit 1
           fi
 
@@ -90,8 +93,8 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/gl-* ]]; then
-            TAG_VERSION="${GITHUB_REF#refs/tags/gl-}"
+          if [[ "${GITHUB_REF}" == refs/tags/gl-bws-cli-v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/gl-bws-cli-v}"
             VERSION="${TAG_VERSION}"
           fi
           if [[ "${VERSION}" == "latest" || "${VERSION}" == "" ]]; then
@@ -234,8 +237,7 @@ jobs:
           context: .
           file: crates/bws/Dockerfile
           platforms: |
-            linux/amd64,
-            linux/arm64/v8
+            linux/amd64
           push: ${{ inputs.release_type != 'Dry Run' }}
           tags: ${{ steps.tag-list.outputs.tags }}
 
