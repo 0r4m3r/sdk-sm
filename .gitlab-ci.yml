@@ -27,10 +27,10 @@ include:
     file: '/rustc/test.yml'
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
-    file: '/gh-release/gh-push-validate.yml'
+    file: '/github/github-validate.yml'
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
-    file: '/gh-release/gh-push-release.yml'
+    file: '/github/github-push.yml'
 
 # Repo-specific overrides for this workspace
 variables:
