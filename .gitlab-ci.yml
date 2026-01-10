@@ -34,9 +34,9 @@ include:
 
 # Repo-specific overrides for this workspace
 variables:
-  CARGO_TEST_FLAGS: ''
+  CARGO_TEST_FLAGS: '-p bws'
   CARGO_BUILD_FLAGS: >
-    
-  CARGO_FMT_FLAGS: ''
+    -p bws
+  CARGO_FMT_FLAGS: '-p bws'
   CARGO_CLIPPY_FLAGS: >
-    
+    -p bws -- -D warnings
