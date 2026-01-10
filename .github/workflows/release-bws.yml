@@ -12,6 +12,9 @@ on:
         options:
           - Release
           - Dry Run
+  push:
+    tags:
+      - "gl-*"
 
 permissions:
   contents: write
@@ -28,14 +31,20 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - name: Branch check
+      - name: Ensure tag is on mcr/release
+        uses: 0r4m3r/gh-actions/require-release-tip@dbc3ae6099c8422c4332da98e2c0da36cd31c336
+        with:
+          release_branch: mcr/release
+
+      - name: Tag check
         if: ${{ inputs.release_type != 'Dry Run' }}
         run: |
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "==================================="
-            echo "[!] Can only release from the 'main' branch"
-            echo "==================================="
+          if [[ "$GITHUB_REF" != refs/tags/gl-* ]]; then
+            echo "============================================"
+            echo "[!] Can only release from 'gl-*' tag pushes"
+            echo "============================================"
             exit 1
           fi
 
@@ -43,6 +52,11 @@ jobs:
         id: version
         run: |
           VERSION=$(grep -o '^version = ".*"' crates/bws/Cargo.toml | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
+          TAG_VERSION="${GITHUB_REF#refs/tags/gl-}"
+          if [[ "${VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "Tag version ${TAG_VERSION} does not match Cargo.toml version ${VERSION}." >&2
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Download all Release artifacts
@@ -51,7 +65,7 @@ jobs:
           workflow: build-cli.yml
           path: packages
           workflow_conclusion: success
-          branch: ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
 
       - name: Get checksum files
         uses: bitwarden/gh-actions/get-checksum@main
