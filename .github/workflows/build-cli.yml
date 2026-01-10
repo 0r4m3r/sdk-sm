@@ -24,6 +24,15 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Ensure tag is on mcr/release
+        run: |
+          git fetch --prune --tags origin mcr/release
+          if ! git merge-base --is-ancestor origin/mcr/release "${GITHUB_SHA}"; then
+            echo "Tag must point to a commit on mcr/release." >&2
+            exit 1
+          fi
 
       - name: Get Package Version
         id: retrieve-version
