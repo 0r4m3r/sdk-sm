@@ -1,13 +1,6 @@
-# Bitwarden Secrets Manager SDK
+# BWS CLI and SDK
 
-This repository houses the Bitwarden Secret Manager SDK. The SDK is written in Rust and provides a
-Rust API, CLI and various language bindings.
-
-# We're Hiring!
-
-Interested in contributing in a big way? Consider joining our team! We're hiring for many positions.
-Please take a look at our [Careers page](https://bitwarden.com/careers/) to see what opportunities
-are currently open as well as what it's like to work at Bitwarden.
+Rust-based SDK and CLI (`bws`) with language bindings and tooling for secrets workflows.
 
 ## Getting Started
 
