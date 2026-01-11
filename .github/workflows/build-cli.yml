@@ -90,7 +90,7 @@ jobs:
 
       - name: Create checksum
         run: |
-          sha256sum "./bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.tar.gz" > "./bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
+          sha256sum "bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.tar.gz" > "bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
