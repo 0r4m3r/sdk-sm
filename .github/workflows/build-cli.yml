@@ -46,7 +46,7 @@ jobs:
           if [[ "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             exit 0
           fi
-          echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.1)." >&2
+          echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.2)." >&2
           exit 1
 
       - name: Validate tag matches Cargo.toml
