@@ -27,16 +27,14 @@ include:
     file: '/rustc/test.yml'
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
-    file: '/github/github-validate.yml'
+    file: '/github/validate.yml'
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
-    file: '/github/github-push.yml'
+    file: '/github/push.yml'
 
 # Repo-specific overrides for this workspace
 variables:
   CARGO_TEST_FLAGS: '-p bws'
-  CARGO_BUILD_FLAGS: >
-    -p bws
+  CARGO_BUILD_FLAGS: '-p bws'
   CARGO_FMT_FLAGS: '-p bws'
-  CARGO_CLIPPY_FLAGS: >
-    -p bws -- -D warnings
+  CARGO_CLIPPY_FLAGS: '-p bws -- -D warnings'
