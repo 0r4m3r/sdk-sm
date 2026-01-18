@@ -52,16 +52,17 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/gl-')
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          if [[ "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "${TAG}" =~ ^gl-bws-cli-v[0-9]+\.[0-9]+\.[0-9]+(-r[0-9]+)?$ ]]; then
             exit 0
           fi
-          echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.2)." >&2
+          echo "Invalid tag: ${TAG}. Expected gl-bws-cli-v<semver> (e.g. gl-bws-cli-v0.0.2 or gl-bws-cli-v0.0.2-r1)." >&2
           exit 1
 
       - name: Validate tag matches Cargo.toml
         if: startsWith(github.ref, 'refs/tags/gl-')
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/gl-bws-cli-v}"
+          TAG_VERSION="${TAG_VERSION%%-r*}"
           if [[ "${TAG_VERSION}" != "${{ steps.retrieve-version.outputs.package_version }}" ]]; then
             echo "Tag version ${TAG_VERSION} does not match Cargo.toml version ${{ steps.retrieve-version.outputs.package_version }}." >&2
             exit 1
