@@ -10,7 +10,7 @@ permissions:
 jobs:
   publish:
     name: Publish bws CLI (linux)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Confirm published release
         run: |
