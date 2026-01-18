@@ -17,18 +17,18 @@ defaults:
 jobs:
   setup:
     name: Setup
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       package_version: ${{ steps.retrieve-version.outputs.package_version }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Checkout shared actions
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ${{ vars.GH_ACTIONS_SHARED_PROJ }}
           ref: ${{ vars.GH_ACTIONS_SHARED_REF }}
@@ -70,19 +70,19 @@ jobs:
 
   build-linux:
     name: Build bws CLI (linux)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: setup
     env:
       _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
       TARGET: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout repo
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Install rust
-        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # stable
+        uses: dtolnay/rust-toolchain@6d653acede28d24f02e3cd41383119e8b1b35921 # stable
         with:
           toolchain: stable
           targets: ${{ env.TARGET }}
@@ -103,7 +103,7 @@ jobs:
           sha256sum "bws-${{ env.TARGET }}-${_PACKAGE_VERSION}.tar.gz" > "bws-sha256-checksums-${_PACKAGE_VERSION}.txt"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: bws-${{ env.TARGET }}-${{ env._PACKAGE_VERSION }}
           path: |
