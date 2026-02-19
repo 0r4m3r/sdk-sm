@@ -41,7 +41,7 @@ include:
 # Repo-specific overrides for bws-cli release delivery
 variables:
   GH_RELEASE_PUSH: "true"
-  GH_FORCE_PUSH: "false"
+  GH_FORCE_PUSH: "true"
   GH_PUBLIC_REPO: "true"
   GL_RELEASE_ASSET: "true"
   GL_CLEAR_GLAB: "false"
