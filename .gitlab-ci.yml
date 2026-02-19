@@ -1,0 +1,90 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^gl-/'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "mcr/staging"'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "mcr/release"'
+    - when: never
+
+stages:
+  - verify
+  - test
+  - github-sync
+  - gitlab-release
+  - gitlab-cleanup
+
+include:
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/verify.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/test.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/validate.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/push.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/gitlab/validate.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/gitlab/release.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/rustc/release-build.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/gitlab/cleanup.yml'
+
+# Repo-specific overrides for this workspace
+variables:
+  GH_RELEASE_PUSH: "false"
+  GH_FORCE_PUSH: "false"
+  GL_RELEASE_ASSET: "true"
+  GL_CLEAR_GLAB: "false"
+  #GH_PUBLIC_REPO: "true"
+  APPEND_VERSION: "true"
+  #If patch 0005 is excluded or apply patches false, then the codex-network-response must be removed from release_bins.
+  APPLY_PATCHES: "true"
+  APPLY_PATCHES_EXCLUDE: ""
+  #RUSTUP_TOOLCHAIN: 'nightly'
+  RELEASE_VERSION: '0.104.0'
+  # Set GL_CICD_RUNNER_RELEASE as a CI/CD variable to a pinned glab image digest.
+  GL_CICD_RUNNER_BUILD: '${GL_CICD_RUNNER_RUST}'
+  GL_RELEASE_TARGET: "x86_64-unknown-linux-gnu"
+  GL_RELEASE_CARGO_MANIFEST: "codex-rs/Cargo.toml"
+  GL_RELEASE_SCHEMA_PATH: "codex-rs/core/config.schema.json"
+  GL_RELEASE_ARTIFACT_PREFIX: "codex-rs"
+  GL_RELEASE_CARGO_EXCLUDES: "codex-windows-sandbox app_test_support core_test_support exec_server_test_support mcp_test_support"
+  RELEASE_BINS: |
+    apply_patch
+    codex
+    codex-app-server
+    codex-app-server-test-client
+    codex-debug-client
+    codex-exec
+    codex-exec-mcp-server
+    codex-execpolicy
+    codex-execpolicy-legacy
+    codex-execve-wrapper
+    codex-file-search
+    codex-linux-sandbox
+    codex-mcp-server
+    codex-network-proxy
+    codex-responses-api-proxy
+    codex-stdio-to-uds
+    codex-tui
+    codex-write-config-schema
+    export
+    logs_client
+    md-events
+    rmcp_test_server
+    test_stdio_server
+    test_streamable_http_server
+    write_schema_fixtures
+  CARGO_TEST_FLAGS: '--manifest-path codex-rs/Cargo.toml -p codex-cli'
+  CARGO_BUILD_FLAGS: '--manifest-path codex-rs/Cargo.toml -p codex-cli'
+  CARGO_FMT_FLAGS: '--manifest-path codex-rs/Cargo.toml -p codex-cli --all --check'
+  CARGO_CLIPPY_FLAGS: '--manifest-path codex-rs/Cargo.toml -p codex-cli -- -D warnings'
