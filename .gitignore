@@ -8,6 +8,8 @@
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+!patches/release/
+!patches/release/series
 x64/
 x86/
 build/
