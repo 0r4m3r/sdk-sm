@@ -42,6 +42,7 @@ include:
 variables:
   GH_RELEASE_PUSH: "true"
   GH_FORCE_PUSH: "false"
+  GH_PUBLIC_REPO: "true"
   GL_RELEASE_ASSET: "true"
   GL_CLEAR_GLAB: "false"
   APPEND_VERSION: "true"
