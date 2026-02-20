@@ -10,14 +10,42 @@ permissions:
   actions: write
 
 jobs:
+  resolve_tag:
+    name: Resolve release tag
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve gl-* tag from workflow run SHA
+        id: resolve
+        run: |
+          set -euo pipefail
+
+          git fetch --force --tags origin
+          tag="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^gl-bws-cli-v' | LC_ALL=C sort | head -n1 || true)"
+          if [ -z "${tag}" ]; then
+            echo "No gl-bws-cli-v* tag points at workflow run SHA ${{ github.event.workflow_run.head_sha }}" >&2
+            exit 1
+          fi
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
   release:
     name: Create GitHub release (linux)
+    needs: resolve_tag
     if: |
       github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.head_branch, 'gl-bws-cli-v')
-    uses: mattycramer/gh-actions/.github/workflows/release-from-workflow-run.yml@6f36c0ac6e0ab2616893db3824e9324523a45162
+      needs.resolve_tag.outputs.tag != ''
+    uses: mattycramer/gh-actions/.github/workflows/release-from-workflow-run.yml@7229a9e4835f635f77a95eaace0be43cbba6a12f
     with:
-      tag: ${{ github.event.workflow_run.head_branch }}
+      tag: ${{ needs.resolve_tag.outputs.tag }}
       tag_prefix: gl-bws-cli-v
       allow_revision_suffix: true
       run_id: ${{ github.event.workflow_run.id }}
