@@ -8,11 +8,14 @@ on:
 permissions:
   contents: write
   actions: write
+  pull-requests: read
 
 jobs:
   resolve_tag:
     name: Resolve release tag
-    if: github.event.workflow_run.conclusion == 'success'
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
@@ -23,15 +26,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Resolve gl-* tag from workflow run SHA
+      - name: Resolve release-policy tag from workflow run SHA
         id: resolve
         run: |
           set -euo pipefail
 
           git fetch --force --tags origin
-          tag="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^gl-bws-cli-v' | LC_ALL=C sort | head -n1 || true)"
+          tag="$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep -E '(^[0-9]{1,10}$|^.*[^0-9][0-9]{1,10}$)' | LC_ALL=C sort | head -n1 || true)"
           if [ -z "${tag}" ]; then
-            echo "No gl-bws-cli-v* tag points at workflow run SHA ${{ github.event.workflow_run.head_sha }}" >&2
+            echo "No tag with trailing 1-10 digit suffix points at workflow run SHA ${{ github.event.workflow_run.head_sha }}" >&2
             exit 1
           fi
 
@@ -42,11 +45,11 @@ jobs:
     needs: resolve_tag
     if: |
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
       needs.resolve_tag.outputs.tag != ''
-    uses: mattycramer/gh-actions/.github/workflows/release-from-workflow-run.yml@7229a9e4835f635f77a95eaace0be43cbba6a12f
+    uses: mattycramer/gh-actions/.github/workflows/release-from-workflow-run.yml@4ad5d3f542f960875f7bc3b17fec77e25b62d3f6
     with:
       tag: ${{ needs.resolve_tag.outputs.tag }}
-      tag_prefix: gl-bws-cli-v
       allow_revision_suffix: true
       run_id: ${{ github.event.workflow_run.id }}
       artifact_prefix: bws-x86_64-unknown-linux-gnu-

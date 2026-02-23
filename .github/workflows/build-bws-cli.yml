@@ -3,12 +3,13 @@ name: Build bws-cli
 on:
   push:
     tags:
-      - "gl-bws-cli-v*"
+      - "**"
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: write
+  pull-requests: read
 
 defaults:
   run:
@@ -31,13 +32,13 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: ${{ vars.GH_ACTIONS_SHARED_PROJ }}
-          ref: ${{ vars.GH_ACTIONS_SHARED_REF }}
+          ref: 4ad5d3f542f960875f7bc3b17fec77e25b62d3f6 # shared tag-policy + release workflow updates
           path: .github/actions/gh-actions
           fetch-depth: 1
           persist-credentials: false
 
       - name: Ensure tag is on mcr/release
-        if: startsWith(github.ref, 'refs/tags/gl-')
+        if: startsWith(github.ref, 'refs/tags/')
         uses: ./.github/actions/gh-actions/actions/require-release-tip
         with:
           release_branch: mcr/release
@@ -54,12 +55,11 @@ jobs:
           fi
           echo "package_version=${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Validate release tag version
-        if: startsWith(github.ref, 'refs/tags/gl-')
+      - name: Validate release tag policy
+        if: startsWith(github.ref, 'refs/tags/')
         uses: ./.github/actions/gh-actions/actions/validate-tag-version
         with:
-          tag_prefix: gl-bws-cli-v
-          expected_version: ${{ steps.version.outputs.package_version }}
+          tag_regex: '(^[0-9]{1,10}$|^.*[^0-9][0-9]{1,10}$)'
           allow_revision_suffix: "true"
 
   build-linux:
